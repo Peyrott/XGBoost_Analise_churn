@@ -1,0 +1,25 @@
+[project]
+name = "churn-prediction"
+version = "0.1.0"
+description = "End-to-end churn prediction pipeline and containerized API"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
+pythonpath = [
+    ".",
+    "src",
+    "api"
+]

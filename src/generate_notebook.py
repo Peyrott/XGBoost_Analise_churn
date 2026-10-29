@@ -1,0 +1,248 @@
+"""Gera o Jupyter Notebook formatado com a Análise Exploratória completa."""
+
+import json
+from pathlib import Path
+
+notebook_content = {
+    "cells": [
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "# 📊 Análise Exploratória de Dados (EDA) — Telco Customer Churn\n",
+                "\n",
+                "**Objetivo:** Compreender os fatores que influenciam o cancelamento de clientes (churn) em uma empresa de telecomunicações, identificar anomalias, avaliar o desbalanceamento de classes e garantir que nenhuma informação futura (*data leakage*) contamine nosso pipeline de Machine Learning.\n",
+                "\n",
+                "### Sumário do Estudo:\n",
+                "1. **Visão Geral & Tipagem de Dados**\n",
+                "2. **Diagnóstico de Valores Ausentes & Anomalias**\n",
+                "3. **Distribuição do Alvo (`Churn`) & Desbalanceamento**\n",
+                "4. **Análise das Variáveis Numéricas & Detecção de Outliers**\n",
+                "5. **Análise de Variáveis Categóricas & Cardinalidade**\n",
+                "6. **Correlação Linear & Insights de Negócio**\n",
+                "7. **Mapeamento de Riscos de Vazamento de Dados (*Data Leakage*)**"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "import pandas as pd\n",
+                "import numpy as np\n",
+                "import matplotlib.pyplot as plt\n",
+                "import seaborn as sns\n",
+                "\n",
+                "# Configurações visuais\n",
+                "sns.set_theme(style='whitegrid', palette='muted')\n",
+                "plt.rcParams['font.size'] = 11\n",
+                "\n",
+                "# Carregamento dos dados brutos\n",
+                "df_raw = pd.read_csv('../data/raw/Telco-Customer-Churn.csv')\n",
+                "print(f'Dimensões: {df_raw.shape[0]} linhas x {df_raw.shape[1]} colunas')\n",
+                "df_raw.head(3)"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 1. Diagnóstico de Valores Ausentes & Correção de `TotalCharges`\n",
+                "\n",
+                "No dataset original, a coluna `TotalCharges` aparece como tipo `object` (texto) em vez de numérico.\n",
+                "Identificamos que existem 11 clientes cujo valor está preenchido com espaços em branco (`' '`).\n",
+                "\n",
+                "> **Explicação de Negócio:** Todos os 11 clientes possuem tempo de casa (`tenure`) igual a **0**, ou seja, acabaram de assinar o plano e ainda não completaram o primeiro ciclo de faturamento. Portanto, o valor correto acumulado é exatamente **0.0**."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "# Verificando os espaços em branco\n",
+                "blanks = (df_raw['TotalCharges'].astype(str).str.strip() == '').sum()\n",
+                "print(f'Registros com TotalCharges em branco: {blanks}')\n",
+                "\n",
+                "# Conversão robusta para float e preenchimento com 0.0\n",
+                "df = df_raw.copy()\n",
+                "df['TotalCharges'] = pd.to_numeric(df['TotalCharges'].astype(str).str.strip(), errors='coerce').fillna(0.0)\n",
+                "print(f'Valores nulos após o tratamento: {df[\"TotalCharges\"].isnull().sum()}')"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 2. Distribuição do Alvo (`Churn`) e Grau de Desbalanceamento\n",
+                "\n",
+                "- **Não-Churn (`No`):** ~73.4% dos clientes\n",
+                "- **Churn (`Yes`):** ~26.6% dos clientes\n",
+                "- **Razão de Desbalanceamento:** 2.77 para 1\n",
+                "\n",
+                "> ⚠️ **Implicação de Modelagem:** Este desbalanceamento moderado significa que um classificador ingênuo que sempre prever 'Não' teria 73.4% de acurácia, mas seria inútil para o negócio. Portanto:\n",
+                "> 1. Acurácia **não** será utilizada como métrica principal.\n",
+                "> 2. Priorizaremos **ROC-AUC**, **PR-AUC**, **Recall** (taxa de detecção de churn) e **F1-Score**.\n",
+                "> 3. Testaremos técnicas de ajuste de peso como `scale_pos_weight` no XGBoost e calibração de threshold financeiro."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "fig, ax = plt.subplots(figsize=(6, 4))\n",
+                "sns.countplot(x='Churn', data=df, hue='Churn', palette=['#3498db', '#e74c3c'], legend=False, ax=ax)\n",
+                "ax.set_title('Distribuição da Variável Alvo (Churn)', fontweight='bold')\n",
+                "ax.set_xlabel('Cancelou o Serviço?')\n",
+                "ax.set_ylabel('Quantidade')\n",
+                "for p in ax.patches:\n",
+                "    h = p.get_height()\n",
+                "    pct = (h / len(df)) * 100\n",
+                "    ax.annotate(f'{h}\\n({pct:.1f}%)', (p.get_x() + p.get_width() / 2., h / 2), ha='center', va='center', color='white', fontweight='bold')\n",
+                "plt.tight_layout()\n",
+                "plt.show()"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 3. Variáveis Numéricas e Avaliação de Outliers\n",
+                "\n",
+                "As variáveis contínuas são:\n",
+                "- `tenure`: Número de meses em que o cliente permaneceu na empresa (0 a 72 meses).\n",
+                "- `MonthlyCharges`: Valor mensal cobrado do cliente ($ 18.25 a $ 118.75).\n",
+                "- `TotalCharges`: Valor total acumulado cobrado ($ 0 a $ 8,684.80)."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']\n",
+                "fig, axes = plt.subplots(1, 3, figsize=(15, 4))\n",
+                "for i, col in enumerate(num_cols):\n",
+                "    sns.kdeplot(data=df, x=col, hue='Churn', common_norm=False, fill=True, palette=['#3498db', '#e74c3c'], ax=axes[i])\n",
+                "    axes[i].set_title(f'Distribuição de {col}', fontweight='bold')\n",
+                "plt.tight_layout()\n",
+                "plt.show()\n",
+                "\n",
+                "# Verificação de outliers com método IQR (Tukey)\n",
+                "stats = df[num_cols].describe().T\n",
+                "stats['IQR'] = stats['75%'] - stats['25%']\n",
+                "stats['Lower'] = stats['25%'] - 1.5 * stats['IQR']\n",
+                "stats['Upper'] = stats['75%'] + 1.5 * stats['IQR']\n",
+                "stats['Outliers'] = [((df[c] < stats.loc[c, 'Lower']) | (df[c] > stats.loc[c, 'Upper'])).sum() for c in num_cols]\n",
+                "stats[['min', 'mean', '50%', 'max', 'IQR', 'Outliers']]"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "> **Principais Insights Numéricos:**\n",
+                "- **`tenure`:** Clientes que cancelam concentram-se fortemente nos primeiros **1 a 12 meses** de contrato. Clientes veteranos (> 60 meses) raramente dão churn.\n",
+                "- **`MonthlyCharges`:** Clientes com mensalidades mais altas ($ 70 - $ 100) têm probabilidade significativamente maior de cancelamento.\n",
+                "- **Outliers:** Nenhuma variável contínua possui outliers artificiais ou pontos extremos anômalos. O método de escala `StandardScaler` é ideal e seguro."
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 4. Variáveis Categóricas e Análise de Cardinalidade\n",
+                "\n",
+                "Vamos inspecionar a quantidade de valores distintos por coluna categórica para determinar a melhor estratégia de encoding."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "cat_cols = [\n",
+                "    'gender', 'SeniorCitizen', 'Partner', 'Dependents', 'PhoneService', 'MultipleLines',\n",
+                "    'InternetService', 'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport',\n",
+                "    'StreamingTV', 'StreamingMovies', 'Contract', 'PaperlessBilling', 'PaymentMethod'\n",
+                "]\n",
+                "cardinality = {col: {'Valores Únicos': df[col].nunique(), 'Exemplos': list(df[col].unique())} for col in cat_cols}\n",
+                "pd.DataFrame(cardinality).T"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "> **Diagnóstico de Cardinalidade:**\n",
+                "- Todas as colunas possuem entre 2 e 4 categorias distintas.\n",
+                "- **Não há alta cardinalidade**, portanto o `OneHotEncoder(handle_unknown='ignore')` é a estratégia recomendada: cria apenas ~45 colunas no total, sem risco de explosão dimensional ou necessidade de técnicas complexas como Target Encoding."
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "fig, axes = plt.subplots(1, 2, figsize=(14, 5))\n",
+                "sns.countplot(data=df, x='Contract', hue='Churn', palette=['#3498db', '#e74c3c'], ax=axes[0])\n",
+                "axes[0].set_title('Churn por Tipo de Contrato', fontweight='bold')\n",
+                "\n",
+                "sns.countplot(data=df, x='PaymentMethod', hue='Churn', palette=['#3498db', '#e74c3c'], ax=axes[1])\n",
+                "axes[1].set_title('Churn por Forma de Pagamento', fontweight='bold')\n",
+                "axes[1].tick_params(axis='x', rotation=20)\n",
+                "plt.tight_layout()\n",
+                "plt.show()"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "> **Insights de Negócio:**\n",
+                "1. **Tipo de Contrato (`Contract`):** Contratos mensais (`Month-to-month`) respondem por quase todo o volume de churn. Contratos de 1 ou 2 anos geram retenção altíssima.\n",
+                "2. **Forma de Pagamento (`PaymentMethod`):** Clientes que pagam com `Electronic check` apresentam taxa de cancelamento substancialmente mais alta do que os que usam débito automático em conta ou cartão de crédito."
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 5. Mapeamento de Fontes de Vazamento de Dados (*Data Leakage*)\n",
+                "\n",
+                "O vazamento de dados ocorre quando o modelo de Machine Learning tem acesso em tempo de treino a informações que não estariam disponíveis no momento da predição real em produção.\n",
+                "\n",
+                "| Coluna / Processo | Diagnóstico de Risco | Mitigação Obrigatória |\n",
+                "| :--- | :--- | :--- |\n",
+                "| `customerID` | **Alto:** Identificador arbitrário. O modelo pode memorizar IDs específicos gerando overfitting severo sem valor preditivo. | **Eliminar imediatamente** antes do pré-processamento. |\n",
+                "| `TotalCharges` | **Médio:** Em alguns sistemas, taxas de quebra de contrato pós-cancelamento são somadas à conta final. No Telco Churn, a coluna é estritamente $\\approx \\text{tenure} \\times \\text{MonthlyCharges}$. | **Segura para uso**, mantida como feature. |\n",
+                "| **Pré-processamento Global** | **Crítico:** Ajustar transformadores (`StandardScaler.fit()`, `OneHotEncoder.fit()`) sobre o conjunto completo vaza a média, desvio e vocabulário do teste para o treino. | **Encapsular tudo via `Pipeline` e `ColumnTransformer`**, chamando `.fit()` exclusivamente em `X_train`. |"
+            ]
+        }
+    ],
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "name": "python",
+            "version": "3.11"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 4
+}
+
+with open(Path("notebooks/01_exploratory_data_analysis.ipynb"), "w", encoding="utf-8") as f:
+    json.dump(notebook_content, f, indent=2, ensure_ascii=False)
+
+print("Notebook salvo com sucesso em notebooks/01_exploratory_data_analysis.ipynb")

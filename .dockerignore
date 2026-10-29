@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Python cache & virtualenv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.venv
+venv
+env
+
+# Tests & Quality
+tests
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Notebooks & exploration
+notebooks
+*.ipynb
+
+# Raw large datasets (API needs the trained model artifacts in models/)
+data/raw
+
+# IDE
+.vscode
+.idea
+.antigravity

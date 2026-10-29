@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telco Churn AI — Simulador de Previsão & Retenção</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0b0f19;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.7);
+      --bg-input: #1f2937;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --border-focus: #6366f1;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent: #06b6d4;
+      --danger: #ef4444;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --text-sub: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.12) 0px, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: rgba(17, 24, 39, 0.8);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 1.25rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+
+    .brand h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand span {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--success);
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 10px var(--success);
+      animation: pulseAnim 2s infinite;
+    }
+
+    @keyframes pulseAnim {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+
+    .docs-btn {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      padding: 0.45rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .docs-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1300px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      width: 100%;
+    }
+
+    /* KPI Highlights */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 1.25rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(99, 102, 241, 0.4);
+    }
+
+    .kpi-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      opacity: 0.6;
+    }
+
+    .kpi-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .kpi-val {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .kpi-sub {
+      font-size: 0.75rem;
+      color: var(--text-sub);
+      margin-top: 0.35rem;
+    }
+
+    /* Main Workspace Grid */
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 1.75rem;
+    }
+
+    @media (max-width: 950px) {
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Form Container */
+    .panel {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 1.75rem;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 1rem;
+    }
+
+    .panel-header h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    /* Presets */
+    .presets-box {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .preset-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preset-btn:hover {
+      background: rgba(99, 102, 241, 0.2);
+      border-color: var(--primary);
+    }
+
+    /* Form Layout */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    input, select {
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      padding: 0.65rem 0.85rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+
+    /* Submit Button */
+    .btn-submit {
+      width: 100%;
+      margin-top: 1.5rem;
+      background: linear-gradient(135deg, var(--primary), #4338ca);
+      color: white;
+      border: none;
+      padding: 0.9rem;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.35);
+      transition: all 0.2s;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 25px rgba(99, 102, 241, 0.5);
+    }
+
+    .btn-submit:active {
+      transform: translateY(0);
+    }
+
+    /* Results Card */
+    .result-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .gauge-card {
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .prob-number {
+      font-size: 3.25rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin: 0.75rem 0;
+      transition: color 0.3s;
+    }
+
+    .progress-bar-bg {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.4s;
+    }
+
+    .decision-badge {
+      display: inline-block;
+      padding: 0.5rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+    }
+
+    .badge-churn {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #fca5a5;
+    }
+
+    .badge-safe {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      color: #6ee7b7;
+    }
+
+    .action-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .action-box h3 {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .action-box p {
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .cost-box {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .cost-mini-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 0.85rem;
+      text-align: center;
+    }
+
+    .cost-mini-title {
+      font-size: 0.7rem;
+      color: var(--text-sub);
+      text-transform: uppercase;
+    }
+
+    .cost-mini-val {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-top: 0.25rem;
+    }
+
+    /* Batch Test Section */
+    .batch-section {
+      margin-top: 2rem;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 1.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--text-sub);
+      margin-top: 3rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <h1>Telco Churn AI Studio</h1>
+        <span>Plataforma de Previsão Preditiva & Inteligência de Retenção</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="status-badge">
+        <div class="pulse"></div>
+        <span>Modelo Online (XGBoost v1.0.0)</span>
+      </div>
+      <a href="/docs" target="_blank" class="docs-btn">Swagger API Docs ↗</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- KPIs -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-title">Capacidade de Ranqueamento</div>
+        <div class="kpi-val" id="kpi-auc">85.3%</div>
+        <div class="kpi-sub">ROC-AUC no Teste Cego</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Taxa de Detecção (Recall)</div>
+        <div class="kpi-val" id="kpi-recall" style="color: var(--accent);">96.1%</div>
+        <div class="kpi-sub">269 de 280 churns capturados</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Threshold Calibrado</div>
+        <div class="kpi-val" id="kpi-thresh">0.26</div>
+        <div class="kpi-sub">Otimizado por Custo Financeiro</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-title">Economia Gerada</div>
+        <div class="kpi-val" id="kpi-savings" style="color: var(--success);">R$ 100.250</div>
+        <div class="kpi-sub">Redução de custos vs. sem modelo</div>
+      </div>
+    </section>
+
+    <!-- Workspace -->
+    <div class="workspace-grid">
+      
+      <!-- Form Input -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Simulador de Cliente Individual</h2>
+          <div class="presets-box">
+            <button class="preset-btn" onclick="applyPreset('churn')">🔴 Cliente Crítico</button>
+            <button class="preset-btn" onclick="applyPreset('safe')">🟢 Cliente Fiel</button>
+            <button class="preset-btn" onclick="applyPreset('medium')">🟡 Cliente Médio</button>
+          </div>
+        </div>
+
+        <form id="churnForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="gender">Gênero</label>
+              <select id="gender" name="gender">
+                <option value="Female">Feminino (Female)</option>
+                <option value="Male">Masculino (Male)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="SeniorCitizen">Idoso (Senior Citizen)</label>
+              <select id="SeniorCitizen" name="SeniorCitizen">
+                <option value="0">Não (0)</option>
+                <option value="1">Sim (1)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="Partner">Possui Cônjuge</label>
+              <select id="Partner" name="Partner">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="Dependents">Possui Dependentes</label>
+              <select id="Dependents" name="Dependents">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="tenure">Tempo de Casa (Meses de Contrato)</label>
+              <input type="number" id="tenure" name="tenure" min="0" max="120" value="2" required>
+            </div>
+
+            <div class="form-group">
+              <label for="Contract">Tipo de Contrato</label>
+              <select id="Contract" name="Contract">
+                <option value="Month-to-month">Mensal (Month-to-month)</option>
+                <option value="One year">Anual (One year)</option>
+                <option value="Two year">Bienal (Two year)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="InternetService">Serviço de Internet</label>
+              <select id="InternetService" name="InternetService">
+                <option value="Fiber optic">Fibra Óptica (Fiber optic)</option>
+                <option value="DSL">DSL</option>
+                <option value="No">Nenhum</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="PaymentMethod">Forma de Pagamento</label>
+              <select id="PaymentMethod" name="PaymentMethod">
+                <option value="Electronic check">Boleto / Electronic check</option>
+                <option value="Mailed check">Cheque / Mailed check</option>
+                <option value="Bank transfer (automatic)">Débito Automático em Conta</option>
+                <option value="Credit card (automatic)">Cartão de Crédito Automático</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="PhoneService">Telefonia Fixa</label>
+              <select id="PhoneService" name="PhoneService">
+                <option value="Yes">Sim</option>
+                <option value="No">Não</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="MultipleLines">Múltiplas Linhas</label>
+              <select id="MultipleLines" name="MultipleLines">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No phone service">Sem serviço telefônico</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="OnlineSecurity">Segurança Online</label>
+              <select id="OnlineSecurity" name="OnlineSecurity">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No internet service">Sem internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="TechSupport">Suporte Técnico Prioritário</label>
+              <select id="TechSupport" name="TechSupport">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No internet service">Sem internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="OnlineBackup">Backup na Nuvem</label>
+              <select id="OnlineBackup" name="OnlineBackup">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No internet service">Sem internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="DeviceProtection">Proteção de Dispositivos</label>
+              <select id="DeviceProtection" name="DeviceProtection">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No internet service">Sem internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="StreamingTV">Streaming TV</label>
+              <select id="StreamingTV" name="StreamingTV">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No internet service">Sem internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="StreamingMovies">Streaming Filmes</label>
+              <select id="StreamingMovies" name="StreamingMovies">
+                <option value="No">Não</option>
+                <option value="Yes">Sim</option>
+                <option value="No internet service">Sem internet</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="PaperlessBilling">Fatura Digital Sem Papel</label>
+              <select id="PaperlessBilling" name="PaperlessBilling">
+                <option value="Yes">Sim</option>
+                <option value="No">Não</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="MonthlyCharges">Fatura Mensal (R$ ou $)</label>
+              <input type="number" id="MonthlyCharges" name="MonthlyCharges" step="0.01" value="70.35" required>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="TotalCharges">Cobrança Total Acumulada</label>
+              <input type="number" id="TotalCharges" name="TotalCharges" step="0.01" value="139.50" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-submit" id="btnPredict">
+            <span>Calcular Risco de Evasão</span> ➜
+          </button>
+        </form>
+      </div>
+
+      <!-- Live Results View -->
+      <div class="panel">
+        <div class="panel-header">
+          <h2>Diagnóstico em Tempo Real</h2>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Threshold: 0.26</span>
+        </div>
+
+        <div class="result-container" id="resultContainer">
+          
+          <div class="gauge-card">
+            <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Probabilidade Calculada</span>
+            <div class="prob-number" id="probDisplay">78.3%</div>
+            <div id="badgeDisplay" class="decision-badge badge-churn">🚨 ALERTA: CHURN PROVÁVEL</div>
+            
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="probBar" style="width: 78.3%; background: var(--danger);"></div>
+            </div>
+          </div>
+
+          <div class="action-box">
+            <h3>Recomendação Tática de Retenção</h3>
+            <p id="recommendationText">Cliente em alto risco de evasão. Acione imediatamente o time de Customer Success com uma oferta de fidelização ou migração para plano anual com desconto promocional.</p>
+          </div>
+
+          <div class="cost-box">
+            <div class="cost-mini-card">
+              <div class="cost-mini-title">Custo da Oferta</div>
+              <div class="cost-mini-val" style="color: var(--warning);">R$ 50,00</div>
+            </div>
+            <div class="cost-mini-card">
+              <div class="cost-mini-title">LTV em Risco</div>
+              <div class="cost-mini-val" style="color: var(--danger);">R$ 500,00</div>
+            </div>
+          </div>
+
+          <div class="action-box" style="border-color: rgba(99, 102, 241, 0.3); background: rgba(99, 102, 241, 0.05);">
+            <h3 style="color: var(--primary);">Interpretação do Algoritmo</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted);" id="explainerText">
+              Contrato mensal + serviço de fibra óptica + ausência de suporte técnico somam alto peso nos resíduos do XGBoost.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    Telco Customer Churn Prediction Studio &bull; Stack: Python 3.11, XGBoost, Scikit-Learn, FastAPI, Docker
+  </footer>
+
+  <script>
+    const presets = {
+      churn: {
+        gender: "Female",
+        SeniorCitizen: "0",
+        Partner: "No",
+        Dependents: "No",
+        tenure: 2,
+        Contract: "Month-to-month",
+        InternetService: "Fiber optic",
+        PaymentMethod: "Electronic check",
+        PhoneService: "Yes",
+        MultipleLines: "No",
+        OnlineSecurity: "No",
+        TechSupport: "No",
+        OnlineBackup: "No",
+        DeviceProtection: "No",
+        StreamingTV: "No",
+        StreamingMovies: "No",
+        PaperlessBilling: "Yes",
+        MonthlyCharges: 79.85,
+        TotalCharges: 159.70
+      },
+      safe: {
+        gender: "Male",
+        SeniorCitizen: "0",
+        Partner: "Yes",
+        Dependents: "Yes",
+        tenure: 62,
+        Contract: "Two year",
+        InternetService: "DSL",
+        PaymentMethod: "Credit card (automatic)",
+        PhoneService: "Yes",
+        MultipleLines: "Yes",
+        OnlineSecurity: "Yes",
+        TechSupport: "Yes",
+        OnlineBackup: "Yes",
+        DeviceProtection: "Yes",
+        StreamingTV: "No",
+        StreamingMovies: "No",
+        PaperlessBilling: "No",
+        MonthlyCharges: 64.10,
+        TotalCharges: 3974.20
+      },
+      medium: {
+        gender: "Male",
+        SeniorCitizen: "1",
+        Partner: "Yes",
+        Dependents: "No",
+        tenure: 18,
+        Contract: "One year",
+        InternetService: "Fiber optic",
+        PaymentMethod: "Bank transfer (automatic)",
+        PhoneService: "Yes",
+        MultipleLines: "Yes",
+        OnlineSecurity: "No",
+        TechSupport: "Yes",
+        OnlineBackup: "Yes",
+        DeviceProtection: "No",
+        StreamingTV: "Yes",
+        StreamingMovies: "Yes",
+        PaperlessBilling: "Yes",
+        MonthlyCharges: 88.50,
+        TotalCharges: 1593.00
+      }
+    };
+
+    function applyPreset(type) {
+      const p = presets[type];
+      if (!p) return;
+      for (const [key, val] of Object.entries(p)) {
+        const el = document.getElementById(key);
+        if (el) el.value = val;
+      }
+      document.getElementById('churnForm').dispatchEvent(new Event('submit'));
+    }
+
+    document.getElementById('churnForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btnPredict');
+      btn.disabled = true;
+      btn.innerHTML = '<span>Calculando...</span> ⏳';
+
+      const formData = new FormData(e.target);
+      const payload = {
+        gender: formData.get('gender'),
+        SeniorCitizen: parseInt(formData.get('SeniorCitizen'), 10),
+        Partner: formData.get('Partner'),
+        Dependents: formData.get('Dependents'),
+        tenure: parseInt(formData.get('tenure'), 10),
+        PhoneService: formData.get('PhoneService'),
+        MultipleLines: formData.get('MultipleLines'),
+        InternetService: formData.get('InternetService'),
+        OnlineSecurity: formData.get('OnlineSecurity'),
+        OnlineBackup: formData.get('OnlineBackup'),
+        DeviceProtection: formData.get('DeviceProtection'),
+        TechSupport: formData.get('TechSupport'),
+        StreamingTV: formData.get('StreamingTV'),
+        StreamingMovies: formData.get('StreamingMovies'),
+        Contract: formData.get('Contract'),
+        PaperlessBilling: formData.get('PaperlessBilling'),
+        PaymentMethod: formData.get('PaymentMethod'),
+        MonthlyCharges: parseFloat(formData.get('MonthlyCharges')),
+        TotalCharges: parseFloat(formData.get('TotalCharges'))
+      };
+
+      try {
+        const res = await fetch('/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error('Falha ao comunicar com a API');
+        const data = await res.json();
+
+        const pct = (data.churn_probability * 100).toFixed(1);
+        const probDisplay = document.getElementById('probDisplay');
+        const probBar = document.getElementById('probBar');
+        const badgeDisplay = document.getElementById('badgeDisplay');
+        const recommendationText = document.getElementById('recommendationText');
+        const explainerText = document.getElementById('explainerText');
+
+        probDisplay.innerText = `${pct}%`;
+        probBar.style.width = `${pct}%`;
+
+        if (data.churn_prediction === 1) {
+          probDisplay.style.color = 'var(--danger)';
+          probBar.style.backgroundColor = 'var(--danger)';
+          badgeDisplay.className = 'decision-badge badge-churn';
+          badgeDisplay.innerText = '🚨 ALERTA: CHURN PROVÁVEL';
+          explainerText.innerText = 'Cliente acima do limiar de segurança (threshold = 0.26). O risco financeiro de perda (R$ 500) compensa amplamente uma oferta imediata de retenção (R$ 50).';
+        } else {
+          probDisplay.style.color = 'var(--success)';
+          probBar.style.backgroundColor = 'var(--success)';
+          badgeDisplay.className = 'decision-badge badge-safe';
+          badgeDisplay.innerText = '✅ BAIXO RISCO: CLIENTE RETIDO';
+          explainerText.innerText = 'Cliente com fidelidade estável (probabilidade abaixo do limiar de 0.26). Não gaste orçamento de retenção desnecessariamente.';
+        }
+
+        recommendationText.innerText = data.decision_recommendation;
+
+      } catch (err) {
+        alert('Erro ao calcular predição: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Calcular Risco de Evasão</span> ➜';
+      }
+    });
+
+    // Auto load model-info metadata
+    window.addEventListener('load', async () => {
+      try {
+        const res = await fetch('/model-info');
+        if (res.ok) {
+          const info = await res.json();
+          if (info.optimal_threshold) {
+            document.getElementById('kpi-thresh').innerText = info.optimal_threshold.toFixed(2);
+          }
+        }
+      } catch (e) {
+        console.warn('Metadata fetch failed:', e);
+      }
+    });
+  </script>
+</body>
+</html>
